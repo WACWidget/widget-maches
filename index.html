@@ -151,7 +151,7 @@ function getJSON(url) {
 function prettyName(slug) { return String(slug || "").replace(/-\d+$/, "").replace(/-/g, " ").replace(/\b\w/g, function (c) { return c.toUpperCase(); }); }
 
 function fmtTC(s) {
-  if (!s) return "Satranç";
+  if (!s) return "Chess";
   if (s.time_class === "daily" || /^1\/\d+/.test(s.time_control || "")) {
     var m = /^1\/(\d+)/.exec(s.time_control || "");
     if (m) { var d = Math.round(+m[1] / 86400); return d + " d/m"; }
@@ -161,13 +161,13 @@ function fmtTC(s) {
     var p = String(s.time_control).split("+"); var base = Math.round(+p[0] / 60);
     return base + "+" + (p[1] || 0);
   }
-  return s.time_class || "Satranç";
+  return s.time_class || "Chess";
 }
 
 function fmtShortDate(ts) {
-  if (!ts) return "TARIH BELIRSIZ";
+  if (!ts) return "TBD";
   var d = new Date(ts * 1000);
-  var months = [" OCAK", " ŞUBAT", " MART", " NİSAN", " MAYIS", " HAZİRAN", " TEMMUZ", " AĞUSTOS", " EYLÜL", " EKİM", " KASIM", " ARALIK"];
+  var months = [" JAN", " FEB", " MAR", " APR", " MAY", " JUN", " JUL", " AUG", " SEP", " OCT", " NOV", " DEC"];
   return d.getDate() + months[d.getMonth()];
 }
 
@@ -187,26 +187,30 @@ function build(entry, detail, kind) {
   var start = (detail && detail.start_time) || entry.start_time || 0;
   var level = kind === "live" ? "live" : needs > 0 ? "need" : "ok";
   
-  // Icon / Logo fallback
   var icon = "https://assets-ds.chess.com/color-icons/community.svg";
   if (detail && detail.icon) icon = detail.icon;
 
+  var oppName = theirs.name || prettyName(slugOf(entry.opponent)) || "TBD";
+
   return {
-    id: id, kind: kind, level: level, name: (detail && detail.name) || entry.name || ("Match " + id),
-    needs: needs, start: start, tc: fmtTC(s), rating: s.min_rating ? (s.min_rating + "-" + (s.max_rating || "1800")) : "Açık",
+    id: id, kind: kind, level: level, 
+    oppName: oppName,
+    needs: needs, start: start, tc: fmtTC(s), 
+    rating: s.min_rating ? (s.min_rating + "-" + (s.max_rating || "1800")) : "Open",
+    rules: s.rules && s.rules !== "chess" ? s.rules : "Chess",
     icon: icon
   };
 }
 
 function card(m) {
   var dateStr = fmtShortDate(m.start);
-  var statusText = m.kind === "live" ? "● CANLI YAYINDA" : m.needs > 0 ? (dateStr + "'DE " + m.needs + "'E İHTİYAÇ VAR") : (dateStr + " - HAZIR");
+  var statusText = m.kind === "live" ? "● IN PROGRESS" : m.needs > 0 ? ("NEEDS " + m.needs + " PLAYERS ON " + dateStr) : ("READY FOR " + dateStr);
   
   return '<a class="m ' + m.level + '" target="_blank" rel="noopener" href="https://www.chess.com/club/matches/' + CLUB + '/' + m.id + '">' +
     '<img class="m-avatar" src="' + esc(m.icon) + '" alt="" />' +
     '<div class="m-body">' +
-      '<div class="name">' + esc(m.name) + '</div>' +
-      '<div class="info">' + esc(m.tc) + ' · ' + esc(m.rating) + ' · Satranç</div>' +
+      '<div class="name">vs ' + esc(m.oppName) + '</div>' +
+      '<div class="info">' + esc(m.tc) + ' · ' + esc(m.rating) + ' · ' + esc(m.rules) + '</div>' +
       '<div class="status-line">' + statusText + '</div>' +
     '</div>' +
     '</a>';
@@ -229,7 +233,7 @@ function render() {
 
   var list = document.getElementById("list");
   if (!view.length) {
-    list.innerHTML = '<div class="empty">Maç bulunamadı.</div>'; return;
+    list.innerHTML = '<div class="empty">No matches found.</div>'; return;
   }
   list.innerHTML = view.map(card).join("");
 }
@@ -249,7 +253,7 @@ function load() {
     state.items = items; render();
     document.getElementById("sync").textContent = "updated " + new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   }).catch(function (err) {
-    document.getElementById("list").innerHTML = '<div class="err">Yüklenemedi.</div>';
+    document.getElementById("list").innerHTML = '<div class="err">Failed to load.</div>';
   });
 }
 
@@ -264,4 +268,3 @@ setInterval(load, REFRESH_MIN * 60000);
 </script>
 </body>
 </html>
-```[cite: 3]
