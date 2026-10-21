@@ -204,7 +204,7 @@ function build(entry, detail, kind) {
 
 function card(m) {
   var dateStr = fmtShortDate(m.start);
-  var statusText = m.kind === "live" ? "● IN PROGRESS" : m.needs > 0 ? ("NEEDS " + m.needs + " PLAYERS ON " + dateStr) : ("READY FOR " + dateStr);
+  var statusText = m.kind === "live" ? "● IN PROGRESS" : m.needs > 0 ? ("NEEDS " + m.needs + (m.needs > 1 ? " PLAYERS" : " PLAYER") + " ON " + dateStr) : (dateStr + " - READY");
   
   return '<a class="m ' + m.level + '" target="_blank" rel="noopener" href="https://www.chess.com/club/matches/' + CLUB + '/' + m.id + '">' +
     '<img class="m-avatar" src="' + esc(m.icon) + '" alt="" />' +
