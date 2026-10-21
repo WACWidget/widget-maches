@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>We Are The Champions - Matches</title>
+<style>
+  :root {
+    --bg: #000000;
+    --panel: #111111;
+    --line: rgba(255,255,255,0.1);
+    --blue: #4aa8ff;
+    --cyan: #64ffda;
+    --text: #ffffff;
+    --mute: #9ca3af;
+    --red: #ff5252;
+    --amber: #ffb84d;
+    --green: #64ffda;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    color: var(--text);
+    font-family: 'Rajdhani', sans-serif;
+    background: #000000;
+  }
+  body {
+    padding: 0;
+    position: relative;
+  }
+
+  .head {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    font-size: 12px; font-weight: 900; letter-spacing: 2px;
+    color: var(--blue); padding: 6px; font-family: 'Orbitron', sans-serif;
+    background: #000000;
+  }
+  .head .sync { font-size: 8.5px; color: var(--mute); font-weight: 600; margin-left: auto; }
+
+  .tabs { display: flex; gap: 4px; margin-bottom: 8px; padding: 0 4px; }
+  .tab {
+    flex: 1; text-align: center; padding: 6px 2px; font-size: 9.5px;
+    font-weight: 850; color: var(--mute);
+    background: #111; border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 10px; cursor: pointer; font-family: 'Orbitron', sans-serif;
+  }
+  .tab.on {
+    color: #000;
+    background: #fff;
+    border-color: #fff;
+  }
+  .tab .n {
+    display: inline-block; min-width: 14px; padding: 1px 4px; margin-left: 3px;
+    border-radius: 6px; background: rgba(255,255,255,.15); font-size: 8.5px;
+  }
+  .tab.on .n { background: rgba(0,0,0,.2); color: #000; }
+  .tab.urgent .n { background: var(--red); color: #fff; }
+
+  .list { display: flex; flex-direction: column; gap: 8px; padding: 0 4px; }
+  .m {
+    position: relative; display: flex; align-items: center; gap: 12px; text-decoration: none; color: inherit;
+    background: #111111;
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 16px; padding: 12px;
+    transition: transform .2s ease, border-color .2s ease;
+  }
+  .m:hover {
+    border-color: rgba(255,255,255,0.3);
+  }
+  .m.need {
+    border-color: rgba(255,82,82,0.4);
+  }
+
+  .m-avatar {
+    width: 48px; height: 48px; border-radius: 12px; object-fit: cover; flex: none;
+    background: #222; border: 1px solid rgba(255,255,255,0.1);
+  }
+
+  .m-body { flex: 1; min-width: 0; }
+  .name { font-size: 15px; font-weight: 900; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .info { font-size: 11px; color: var(--mute); margin-top: 2px; }
+  
+  .status-line {
+    font-size: 11.5px; font-weight: 900; margin-top: 5px; font-family: 'Orbitron', sans-serif;
+    letter-spacing: .5px;
+  }
+  .m.need .status-line { color: #ff5252; }
+  .m.ok .status-line { color: var(--green); }
+  .m.live .status-line { color: var(--cyan); }
+
+  .empty, .err {
+    text-align: center; font-size: 10.5px; color: var(--mute); padding: 16px 8px;
+    background: #111; border: 1px dashed rgba(255,255,255,0.2); border-radius: 12px;
+  }
+  .skel {
+    height: 72px; border-radius: 16px;
+    background: linear-gradient(90deg,#111 25%,#222 50%,#111 75%);
+    background-size: 200% 100%; animation: sh 1.3s linear infinite;
+  }
+  @keyframes sh { to { background-position: -200% 0; } }
+
+  .foot { text-align: center; margin-top: 10px; padding-bottom: 4px; }
+  .foot a {
+    font-size: 9.5px; font-weight: 850; color: var(--blue); text-decoration: none;
+    font-family: 'Orbitron', sans-serif;
+  }
+  #dbg {
+    display: none; margin-top: 6px; font: 9px/1.3 monospace; color: var(--amber);
+    white-space: pre-wrap; word-break: break-all; background: #000;
+    border: 1px solid rgba(255,255,255,0.1); padding: 5px; border-radius: 5px;
+  }
+</style>
+</head>
+<body>
+
+<div class="head">
+  <span>⚔️ MATCH CENTER</span><span class="sync" id="sync"></span>
+</div>
+
+<div class="tabs" id="tabs">
+  <div class="tab on" data-f="all">ALL<span class="n" id="n-all">0</span></div>
+  <div class="tab" data-f="need">NEEDS PLAYERS<span class="n" id="n-need">0</span></div>
+  <div class="tab" data-f="live">LIVE<span class="n" id="n-live">0</span></div>
+</div>
+
+<div class="list" id="list"><div class="skel"></div><div class="skel"></div></div>
+
+<div class="foot"><a id="allLink" target="_blank" rel="noopener" href="#">All club matches ➔</a></div>
+<div id="dbg"></div>
+
+<script>
+var CLUB = "we-are-the-champions-7";
+var MAX_UPCOMING = 10;
+var MAX_LIVE = 4;
+var REFRESH_MIN = 5;
+var API = "https://api.chess.com/pub/";
+
+var DEBUG = /[?&]debug=1/.test(location.search);
+var dbg = document.getElementById("dbg");
+function log(x) { if (DEBUG) { dbg.style.display = "block"; dbg.textContent += x + "\n"; } }
+
+var state = { items: [], filter: "all" };
+document.getElementById("allLink").href = "https://www.chess.com/club/matches/" + CLUB;
+
+function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]; }); }
+function idOf(url) { return String(url || "").replace(/\/+$/, "").split("/").pop(); }
+function slugOf(url) { return idOf(url); }
+function getJSON(url) {
+  return fetch(url).then(function (r) { if (!r.ok) throw new Error(r.status + " " + url); return r.json(); });
+}
+function prettyName(slug) { return String(slug || "").replace(/-\d+$/, "").replace(/-/g, " ").replace(/\b\w/g, function (c) { return c.toUpperCase(); }); }
+
+function fmtTC(s) {
+  if (!s) return "Satranç";
+  if (s.time_class === "daily" || /^1\/\d+/.test(s.time_control || "")) {
+    var m = /^1\/(\d+)/.exec(s.time_control || "");
+    if (m) { var d = Math.round(+m[1] / 86400); return d + " d/m"; }
+    return "Daily";
+  }
+  if (s.time_control) {
+    var p = String(s.time_control).split("+"); var base = Math.round(+p[0] / 60);
+    return base + "+" + (p[1] || 0);
+  }
+  return s.time_class || "Satranç";
+}
+
+function fmtShortDate(ts) {
+  if (!ts) return "TARIH BELIRSIZ";
+  var d = new Date(ts * 1000);
+  var months = [" OCAK", " ŞUBAT", " MART", " NİSAN", " MAYIS", " HAZİRAN", " TEMMUZ", " AĞUSTOS", " EYLÜL", " EKİM", " KASIM", " ARALIK"];
+  return d.getDate() + months[d.getMonth()];
+}
+
+function build(entry, detail, kind) {
+  var id = idOf(entry["@id"] || entry.url || (detail && detail["@id"]));
+  var teams = (detail && detail.teams) || {};
+  var t1 = teams.team1 || {}, t2 = teams.team2 || {};
+  var ours = t1, theirs = t2;
+  if (String(t2["@id"] || "").indexOf(CLUB) > -1) { ours = t2; theirs = t1; }
+  else if (String(t1["@id"] || "").indexOf(CLUB) === -1 && entry.opponent) {
+    theirs = { name: prettyName(slugOf(entry.opponent)) };
+  }
+  var s = (detail && detail.settings) || {};
+  var joined = (ours.players || []).length;
+  var min = +s.min_team_players || 0;
+  var needs = min ? Math.max(0, min - joined) : 0;
+  var start = (detail && detail.start_time) || entry.start_time || 0;
+  var level = kind === "live" ? "live" : needs > 0 ? "need" : "ok";
+  
+  // Icon / Logo fallback
+  var icon = "https://assets-ds.chess.com/color-icons/community.svg";
+  if (detail && detail.icon) icon = detail.icon;
+
+  return {
+    id: id, kind: kind, level: level, name: (detail && detail.name) || entry.name || ("Match " + id),
+    needs: needs, start: start, tc: fmtTC(s), rating: s.min_rating ? (s.min_rating + "-" + (s.max_rating || "1800")) : "Açık",
+    icon: icon
+  };
+}
+
+function card(m) {
+  var dateStr = fmtShortDate(m.start);
+  var statusText = m.kind === "live" ? "● CANLI YAYINDA" : m.needs > 0 ? (dateStr + "'DE " + m.needs + "'E İHTİYAÇ VAR") : (dateStr + " - HAZIR");
+  
+  return '<a class="m ' + m.level + '" target="_blank" rel="noopener" href="https://www.chess.com/club/matches/' + CLUB + '/' + m.id + '">' +
+    '<img class="m-avatar" src="' + esc(m.icon) + '" alt="" />' +
+    '<div class="m-body">' +
+      '<div class="name">' + esc(m.name) + '</div>' +
+      '<div class="info">' + esc(m.tc) + ' · ' + esc(m.rating) + ' · Satranç</div>' +
+      '<div class="status-line">' + statusText + '</div>' +
+    '</div>' +
+    '</a>';
+}
+
+function render() {
+  var items = state.items.slice();
+  var needCount = items.filter(function (m) { return m.level === "need"; }).length;
+  var liveCount = items.filter(function (m) { return m.kind === "live"; }).length;
+  var upCount = items.filter(function (m) { return m.kind !== "live"; }).length;
+  document.getElementById("n-all").textContent = upCount;
+  document.getElementById("n-need").textContent = needCount;
+  document.getElementById("n-live").textContent = liveCount;
+  document.querySelector('.tab[data-f="need"]').classList.toggle("urgent", needCount > 0);
+
+  var f = state.filter, view;
+  if (f === "need") view = items.filter(function (m) { return m.level === "need"; });
+  else if (f === "live") view = items.filter(function (m) { return m.kind === "live"; });
+  else view = items.filter(function (m) { return m.kind !== "live"; });
+
+  var list = document.getElementById("list");
+  if (!view.length) {
+    list.innerHTML = '<div class="empty">Maç bulunamadı.</div>'; return;
+  }
+  list.innerHTML = view.map(card).join("");
+}
+
+function load() {
+  return getJSON(API + "club/" + CLUB + "/matches").then(function (d) {
+    var reg = (d.registered || []).slice().sort(function (a, b) { return (a.start_time || 9e12) - (b.start_time || 9e12); }).slice(0, MAX_UPCOMING);
+    var live = (d.in_progress || []).slice(0, MAX_LIVE);
+    var jobs = reg.map(function (e) { return { e: e, k: "up" }; }).concat(live.map(function (e) { return { e: e, k: "live" }; }));
+    return Promise.all(jobs.map(function (j) {
+      var id = idOf(j.e["@id"] || j.e.url);
+      return getJSON(API + "match/" + id)
+        .then(function (det) { return build(j.e, det, j.k); })
+        .catch(function () { return build(j.e, null, j.k); });
+    }));
+  }).then(function (items) {
+    state.items = items; render();
+    document.getElementById("sync").textContent = "updated " + new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  }).catch(function (err) {
+    document.getElementById("list").innerHTML = '<div class="err">Yüklenemedi.</div>';
+  });
+}
+
+document.getElementById("tabs").addEventListener("click", function (e) {
+  var t = e.target.closest(".tab"); if (!t) return;
+  [].forEach.call(document.querySelectorAll(".tab"), function (x) { x.classList.remove("on"); });
+  t.classList.add("on"); state.filter = t.getAttribute("data-f"); render();
+});
+
+load();
+setInterval(load, REFRESH_MIN * 60000);
+</script>
+</body>
+</html>
+```[cite: 3]
